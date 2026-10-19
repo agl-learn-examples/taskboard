@@ -6,4 +6,4 @@ COPY . .
 RUN useradd --create-home app
 USER app
 EXPOSE 8000
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "wsgi:app"]
+CMD ["./start.sh"]

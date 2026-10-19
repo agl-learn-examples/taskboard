@@ -14,6 +14,7 @@ def create_app(config=None):
     app.config.from_object(Config)
     if config:
         app.config.update(config)
+    app.json.sort_keys = False               # keep JSON keys in the order we write them
 
     db.init_app(app)
     migrate.init_app(app, db)
