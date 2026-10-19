@@ -22,10 +22,10 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 | web app | `web/` | Angular | A5 (later) |
 | phone app | `mobile/` | Flutter | A6 (later) |
 
-## You are at tag `a4-gateway`
+## You are at tag `b2-pytest`
 
-The end of Course A4, *The API gateway*: the whole stack runs in Docker Compose, and only the gateway has a
-port on your laptop. The API is version 1, under `/v1/`.
+Course B2, *Pytest from zero*: the API has a test suite to learn from (`api/tests/`), with fixtures, parametrize,
+mocking and coverage. The app is the same as at `a4-gateway`.
 
 ## Run it (one command)
 
@@ -71,7 +71,7 @@ database may be from another tag) and start again as the README at that tag says
 | `a2-flask` | A2 · Backend APIs with Python Flask | blueprints, validation, SQLAlchemy on Postgres, Alembic migrations, tenants, pagination |
 | `a3-auth` | A3 · Security: logins and JWT | bcrypt passwords, JWT access and refresh tokens, roles, Redis sessions and logout |
 | `a4-gateway` | A4 · The API gateway | nginx in front: routing, token check, rate limits, JSON logs; one-command stack |
-| `b2-pytest` | B2 · Pytest from zero | (coming) fixtures, parametrize, mocking, coverage |
+| `b2-pytest` | B2 · Pytest from zero | the test suite: fixtures, parametrize, mocking, coverage |
 | `b3-api-tests` | B3 · API testing | (coming) httpx tests against the running stack, in CI |
 
 ## Endpoints
@@ -119,13 +119,34 @@ A tenant that stopped paying is read-only: `docker compose exec api flask --app 
     docker compose exec db psql -U taskboard -c "SELECT id, tenant_id, title, done FROM tasks"
     docker compose exec redis redis-cli keys '*'
 
+## Tests
+
+    cd api
+    python3 -m venv .venv
+    . .venv/bin/activate
+    pip install -r requirements-dev.txt
+    pytest                           # every test; they use SQLite and a fake Redis, so nothing else needs to run
+    pytest tests/unit                # only the unit tests: one function at a time
+    pytest -k refresh -v             # only tests with "refresh" in their name, one line each
+    pytest --cov                     # and which lines of taskboard/ no test reached
+
+| where | what | example |
+|---|---|---|
+| `api/tests/unit/` | unit tests: one function, no app or database | `test_validation.py` (parametrize), `test_cache.py` (mocking Redis) |
+| `api/tests/` | the API service through Flask's test client, with a fresh database per test | `test_auth.py`, `test_roles.py` |
+| `api/tests/conftest.py` | shared fixtures: `app`, `client`, `tenant` (a signed-up, logged-in owner) | |
+
+GitHub Actions runs them on every push and pull request (`.github/workflows/ci.yml`).
+
 ## Work on the API without Docker
 
     cd api
     python3 -m venv .venv
     . .venv/bin/activate
     pip install -r requirements-dev.txt
-    pytest                           # the tests use SQLite and a fake Redis: nothing else to start
+    flask --app wsgi db upgrade      # makes taskboard.db (SQLite) from the migrations
+    flask --app wsgi seed            # demo data; needs Redis only for logging in
+    flask --app wsgi run
 
 A new model field needs a migration: `flask --app wsgi db migrate -m "what changed"` (against `DATABASE_URL`,
 SQLite by default) writes a file in `api/migrations/versions/`. Read it, then `flask --app wsgi db upgrade`.
