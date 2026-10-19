@@ -48,6 +48,26 @@ class TaskPatch(Body):
     board_id: int | None = None
 
 
+class TaskQuery(BaseModel):
+    """GET /tasks?done=false&priority=high&q=notes&sort=-created_at&page=2&per_page=10"""
+    model_config = ConfigDict(extra="forbid")
+    done: bool | None = None
+    priority: Priority | None = None
+    board_id: int | None = None
+    q: str | None = Field(default=None, max_length=100)        # words in the title
+    sort: Literal["id", "title", "-title", "created_at", "-created_at", "priority", "-priority"] = "id"
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=20, ge=1, le=100)
+
+
+def parse_query(model):
+    try:
+        return model.model_validate(request.args.to_dict())
+    except ValidationError as e:
+        details = [{"field": ".".join(str(p) for p in err["loc"]), "message": err["msg"]} for err in e.errors()]
+        raise ApiError(400, "invalid query", details=details)
+
+
 def parse(model):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):

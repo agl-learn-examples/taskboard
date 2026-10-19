@@ -4,7 +4,7 @@ from ..errors import ApiError
 from ..extensions import db
 from ..models import Board, Task
 from ..tenancy import current_tenant, writable_tenant
-from ..validation import TaskIn, TaskPatch, parse
+from ..validation import TaskIn, TaskPatch, TaskQuery, parse, parse_query
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
@@ -22,11 +22,31 @@ def check_board(tenant, board_id):
         raise ApiError(400, "invalid input", details=[{"field": "board_id", "message": "no such board"}])
 
 
+PRIORITY_RANK = db.case({"low": 0, "normal": 1, "high": 2}, value=Task.priority)
+SORTS = {"id": Task.id, "title": Task.title, "created_at": Task.created_at, "priority": PRIORITY_RANK}
+
+
 @bp.get("")
 def list_tasks():
+    """One page of this tenant's tasks, filtered and sorted:
+    {"items": [...], "page": 1, "per_page": 20, "total": 42}"""
     tenant = current_tenant()
-    query = db.select(Task).filter_by(tenant_id=tenant.id).order_by(Task.id)
-    return [t.to_dict() for t in db.session.scalars(query)]
+    args = parse_query(TaskQuery)
+    query = db.select(Task).filter_by(tenant_id=tenant.id)
+    if args.done is not None:
+        query = query.filter_by(done=args.done)
+    if args.priority:
+        query = query.filter_by(priority=args.priority)
+    if args.board_id is not None:
+        query = query.filter_by(board_id=args.board_id)
+    if args.q:
+        query = query.where(Task.title.ilike(f"%{args.q}%"))       # a bound parameter: no SQL injection
+    total = db.session.scalar(db.select(db.func.count()).select_from(query.subquery()))
+    column = SORTS[args.sort.lstrip("-")]
+    query = query.order_by(column.desc() if args.sort.startswith("-") else column, Task.id)
+    query = query.limit(args.per_page).offset((args.page - 1) * args.per_page)
+    return {"items": [t.to_dict() for t in db.session.scalars(query)],
+            "page": args.page, "per_page": args.per_page, "total": total}
 
 
 @bp.post("")
