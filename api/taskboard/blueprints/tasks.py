@@ -1,9 +1,10 @@
-from flask import Blueprint, request
+from flask import Blueprint
 
 from ..errors import ApiError
 from ..extensions import db
-from ..models import PRIORITIES, Task
+from ..models import Board, Task
 from ..tenancy import current_tenant, writable_tenant
+from ..validation import TaskIn, TaskPatch, parse
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
@@ -16,6 +17,11 @@ def find_task(tenant, task_id):
     return task
 
 
+def check_board(tenant, board_id):
+    if board_id is not None and not db.session.scalar(db.select(Board).filter_by(id=board_id, tenant_id=tenant.id)):
+        raise ApiError(400, "invalid input", details=[{"field": "board_id", "message": "no such board"}])
+
+
 @bp.get("")
 def list_tasks():
     tenant = current_tenant()
@@ -26,13 +32,9 @@ def list_tasks():
 @bp.post("")
 def create_task():
     tenant = writable_tenant()
-    data = request.get_json(silent=True) or {}
-    if not data.get("title"):
-        raise ApiError(400, "title is required")
-    priority = data.get("priority", "normal")
-    if priority not in PRIORITIES:
-        raise ApiError(400, "priority must be low, normal or high")
-    task = Task(tenant_id=tenant.id, title=data["title"], priority=priority, board_id=data.get("board_id"))
+    data = parse(TaskIn)
+    check_board(tenant, data.board_id)
+    task = Task(tenant_id=tenant.id, **data.model_dump())
     db.session.add(task)
     db.session.commit()
     return task.to_dict(), 201, {"Location": f"/tasks/{task.id}"}
@@ -45,11 +47,30 @@ def get_task(task_id):
 
 @bp.put("/<int:task_id>")
 def replace_task(task_id):
-    task = find_task(writable_tenant(), task_id)
-    data = request.get_json(silent=True) or {}
-    if not data.get("title"):
-        raise ApiError(400, "title is required")
-    task.title, task.done = data["title"], bool(data.get("done"))
+    """PUT replaces the whole task: fields you leave out go back to their defaults."""
+    tenant = writable_tenant()
+    task = find_task(tenant, task_id)
+    data = parse(TaskIn)
+    check_board(tenant, data.board_id)
+    for field, value in data.model_dump().items():
+        setattr(task, field, value)
+    db.session.commit()
+    return task.to_dict()
+
+
+@bp.patch("/<int:task_id>")
+def update_task(task_id):
+    """PATCH changes only the fields you send."""
+    tenant = writable_tenant()
+    task = find_task(tenant, task_id)
+    data = parse(TaskPatch)
+    changes = data.model_dump(exclude_unset=True)
+    if "board_id" in changes:
+        check_board(tenant, changes["board_id"])
+    for field, value in changes.items():
+        if value is None and field != "board_id":
+            raise ApiError(400, "invalid input", details=[{"field": field, "message": "may not be null"}])
+        setattr(task, field, value)
     db.session.commit()
     return task.to_dict()
 

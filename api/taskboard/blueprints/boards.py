@@ -1,9 +1,9 @@
-from flask import Blueprint, request
+from flask import Blueprint
 
-from ..errors import ApiError
 from ..extensions import db
 from ..models import Board
 from ..tenancy import current_tenant, writable_tenant
+from ..validation import BoardIn, parse
 
 bp = Blueprint("boards", __name__, url_prefix="/boards")
 
@@ -17,10 +17,7 @@ def list_boards():
 @bp.post("")
 def create_board():
     tenant = writable_tenant()
-    data = request.get_json(silent=True) or {}
-    if not data.get("name"):
-        raise ApiError(400, "name is required")
-    board = Board(tenant_id=tenant.id, name=data["name"])
+    board = Board(tenant_id=tenant.id, name=parse(BoardIn).name)
     db.session.add(board)
     db.session.commit()
     return board.to_dict(), 201
