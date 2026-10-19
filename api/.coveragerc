@@ -1,0 +1,8 @@
+# pytest --cov    : how much of taskboard/ the tests ran, and which lines they never reached
+[run]
+source = taskboard
+branch = true
+
+[report]
+show_missing = true
+skip_covered = true
