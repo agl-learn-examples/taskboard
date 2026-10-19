@@ -44,6 +44,17 @@ def current_tenant():
     return db.session.get(Tenant, current_user().tenant_id)
 
 
+RANK = {"member": 0, "admin": 1, "owner": 2}
+
+
+def require_role(role):
+    """403 unless the user's role is at least `role` (member < admin < owner)"""
+    user = current_user()
+    if RANK[user.role] < RANK[role]:
+        raise ApiError(403, f"only an {role} can do this", code="forbidden")
+    return user
+
+
 def writable_tenant():
     """the tenant, if it may change data: a tenant that stopped paying is read-only"""
     tenant = current_tenant()

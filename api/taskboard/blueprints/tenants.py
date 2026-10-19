@@ -1,11 +1,12 @@
 from flask import Blueprint
 
+from .. import cache
 from ..errors import ApiError
 from ..extensions import db
 from ..models import PLAN_MEMBER_LIMIT, User
-from ..tenancy import current_tenant, writable_tenant
+from ..tenancy import current_tenant, require_role, writable_tenant
 from ..security import hash_password
-from ..validation import MemberIn, parse
+from ..validation import MemberIn, PlanIn, parse
 
 bp = Blueprint("tenants", __name__, url_prefix="/tenants")
 
@@ -23,6 +24,8 @@ def list_members():
 
 @bp.post("/me/members")
 def add_member():
+    """admins and owners add members; the plan decides how many"""
+    require_role("admin")
     tenant = writable_tenant()
     data = parse(MemberIn)
     limit = PLAN_MEMBER_LIMIT[tenant.plan]
@@ -37,3 +40,35 @@ def add_member():
     db.session.add(user)
     db.session.commit()
     return user.to_dict(), 201
+
+
+@bp.delete("/me/members/<int:user_id>")
+def remove_member(user_id):
+    me = require_role("admin")
+    tenant = writable_tenant()
+    user = db.session.scalar(db.select(User).filter_by(id=user_id, tenant_id=tenant.id))
+    if user is None:
+        raise ApiError(404, "not found")
+    if user.role == "owner":
+        raise ApiError(403, "the owner cannot be removed", code="forbidden")
+    if user.id == me.id:
+        raise ApiError(400, "you cannot remove yourself")
+    db.session.delete(user)
+    db.session.commit()
+    return "", 204
+
+
+@bp.put("/me/plan")
+def change_plan():
+    """Only the owner changes the plan. (A real app would take a payment here first.)"""
+    require_role("owner")
+    tenant = current_tenant()
+    data = parse(PlanIn)
+    count = db.session.scalar(db.select(db.func.count(User.id)).filter_by(tenant_id=tenant.id))
+    limit = PLAN_MEMBER_LIMIT[data.plan]
+    if limit is not None and count > limit:
+        raise ApiError(409, f"the {data.plan.title()} plan allows up to {limit} members; you have {count}")
+    tenant.plan = data.plan
+    db.session.commit()
+    cache.forget_tenant(tenant.id)
+    return tenant.to_dict()

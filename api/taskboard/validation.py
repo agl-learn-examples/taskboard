@@ -44,6 +44,10 @@ class RefreshIn(Body):
     refresh_token: str
 
 
+class PlanIn(Body):
+    plan: Literal["free", "team"]
+
+
 class BoardIn(Body):
     name: str = Name
 

@@ -37,3 +37,18 @@ def register(app):
         db.session.commit()
         click.echo(f"seeded: BlueLeaf Studio (tenant {blueleaf.id}), Sharma Traders (tenant {sharma.id}); "
                    f"every demo user's password is {DEMO_PASSWORD}")
+
+
+    @app.cli.command("set-active")
+    @click.argument("tenant_name")
+    @click.argument("active", type=click.BOOL)
+    def set_active(tenant_name, active):
+        """Mark a tenant as paying (true) or not paying (false, read-only)."""
+        from .cache import forget_tenant
+        tenant = db.session.scalar(db.select(Tenant).filter_by(name=tenant_name))
+        if tenant is None:
+            raise click.ClickException(f"no tenant named {tenant_name!r}")
+        tenant.active = active
+        db.session.commit()
+        forget_tenant(tenant.id)
+        click.echo(f"{tenant.name}: active={tenant.active}")
