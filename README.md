@@ -1,49 +1,54 @@
 # TaskBoard
 
-TaskBoard is a small to-do app for teams, sold as SaaS (software as a service). It is the running example of
-the **Build a SaaS App** and **Testing and Quality** courses in Career Launch on
-[agentlabs learn](https://learning.myagentlabs.ai).
+TaskBoard is a small to-do app for teams, sold as SaaS (software as a service). Teams sign up, invite their
+members and share task boards. It is the running example of the **Build a SaaS App** and **Testing and
+Quality** courses in Career Launch on [agentlabs learn](https://learning.myagentlabs.ai).
 
 It starts as the Tasks API you met in the DevOps track, and grows up course by course:
 
-| part | what it does | built in |
-|---|---|---|
-| `api/` | the API service: Python and Flask | A2, A3 |
-| Postgres | the database: tenants, users, tasks | A2 |
-| Redis | fast, short-lived data: sessions, cached plans | A3 |
-| `gateway/` | the one front door (nginx): routing, token check, rate limit, logs | A4 |
-| `web/` | the web app (Angular) | A5 (later) |
-| `mobile/` | the phone app (Flutter) | A6 (later) |
+```
+ web app (Angular, A5) ──┐
+                         ├─► API gateway (nginx) ─► API service (Flask) ─┬─► Postgres (data, on disk)
+ phone app (Flutter, A6) ┘   route · check token    tenants · users      └─► Redis (sessions, cached plans)
+                             rate limit · log       plans · tasks
+```
 
-## You are at tag `a3-auth`
+| part | folder | what it does | built in |
+|---|---|---|---|
+| API gateway | `gateway/` | the one front door (nginx): routing, token check, rate limit, logs | A4 |
+| API service | `api/` | Python and Flask: the rules (tenants, users, roles, plans, tasks) | A2, A3 |
+| Postgres | (image) | the database: tenants, users, boards, tasks | A2 |
+| Redis | (image) | fast, short-lived data: sessions, logged-out tokens, cached plans | A3 |
+| web app | `web/` | Angular | A5 (later) |
+| phone app | `mobile/` | Flutter | A6 (later) |
 
-The end of Course A3, *Security: logins and JWT*. Users log in with a password (stored as a bcrypt hash) and get
-a JWT access token (15 minutes) and a refresh token (7 days). Every request sends
-`Authorization: Bearer <access token>`; the tenant comes from the signed token. Redis remembers sessions
-(refresh tokens), logged-out tokens and each tenant's plan. Roles: member, admin, owner.
+## You are at tag `a4-gateway`
+
+The end of Course A4, *The API gateway*: the whole stack runs in Docker Compose, and only the gateway has a
+port on your laptop. The API is version 1, under `/v1/`.
 
 ## Run it (one command)
 
-You need Docker with Compose v2.
+You need [Docker](https://docs.docker.com/get-docker/) with Compose v2 (`docker compose version`) and Git.
 
     git clone https://github.com/agl-learn-examples/taskboard.git
     cd taskboard
-    git checkout a3-auth
-    cp .env.example .env
     docker compose up --build
 
-In a second terminal, add the demo data, log in as Priya and ask for her team's tasks:
+The first start downloads the images and takes a few minutes. It is ready when the gateway says `Healthy`
+(`docker compose ps` in a second terminal). Stop it with Ctrl+C; `docker compose down -v` also deletes the data.
 
-    docker compose exec api flask --app wsgi seed
-    curl -s localhost:8000/auth/login -H "Content-Type: application/json" \
+The stack starts with demo data. In a second terminal, log in as Priya and ask for her team's tasks:
+
+    curl -s localhost:8080/v1/auth/login -H "Content-Type: application/json" \
          -d '{"email": "priya@blueleaf.example", "password": "demo-password-123"}'
 
 Copy the `access_token` from the answer, then:
 
     TOKEN=<paste it here>
-    curl -H "Authorization: Bearer $TOKEN" localhost:8000/tasks
+    curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/tasks
 
-The demo users (password `demo-password-123`, a fake one for practice):
+The demo users all have the password `demo-password-123`, a fake one for practice:
 
 | user | tenant | plan | role |
 |---|---|---|---|
@@ -52,11 +57,28 @@ The demo users (password `demo-password-123`, a fake one for practice):
 | meera@blueleaf.example | BlueLeaf Studio | Team | member |
 | ravi@sharma.example | Sharma Traders | Free | owner |
 
-Stop with Ctrl+C; `docker compose down -v` also deletes the database.
+Settings (ports, passwords, rate limits) have practice defaults in `compose.yaml`. To change one, copy
+`.env.example` to `.env` and edit it. Every value in it is a fake example: never put a real secret in git.
+
+## Which lesson uses which tag
+
+Each lesson says "check out tag X". To go there: `git checkout X`, then `docker compose down -v` (the
+database may be from another tag) and start again as the README at that tag says.
+
+| tag | course | what the code has |
+|---|---|---|
+| `a1-start` | A1 · How a SaaS app fits together | the Tasks API from the DevOps track, unchanged, in `api/` |
+| `a2-flask` | A2 · Backend APIs with Python Flask | blueprints, validation, SQLAlchemy on Postgres, Alembic migrations, tenants, pagination |
+| `a3-auth` | A3 · Security: logins and JWT | bcrypt passwords, JWT access and refresh tokens, roles, Redis sessions and logout |
+| `a4-gateway` | A4 · The API gateway | nginx in front: routing, token check, rate limits, JSON logs; one-command stack |
+| `b2-pytest` | B2 · Pytest from zero | (coming) fixtures, parametrize, mocking, coverage |
+| `b3-api-tests` | B3 · API testing | (coming) httpx tests against the running stack, in CI |
 
 ## Endpoints
 
-All but `/health` and the first four `/auth` routes need `Authorization: Bearer <access token>`.
+Through the gateway, every path starts with `/v1` (`localhost:8080/v1/tasks`). All but `/v1/health` and the
+first three `/auth` routes need `Authorization: Bearer <access token>`; without a valid one the gateway answers
+401 and the API never sees the request.
 
 | method | path | who | does |
 |---|---|---|---|
@@ -64,7 +86,6 @@ All but `/health` and the first four `/auth` routes need `Authorization: Bearer 
 | POST | /auth/signup | anyone | a new tenant (Free plan) and its owner: `{"tenant_name", "name", "email", "password"}` |
 | POST | /auth/login | anyone | `{"email", "password"}` → `{"access_token", "refresh_token", "token_type", "expires_in"}` |
 | POST | /auth/refresh | anyone | `{"refresh_token"}` → a new token pair; each refresh token works once |
-| GET | /auth/verify | anyone | 204 if the access token is valid, else 401 (the gateway's check) |
 | POST | /auth/logout | member | ends the session: `{"refresh_token"}` |
 | GET | /auth/me | member | you and your tenant |
 | GET | /tenants/me | member | your tenant |
@@ -76,11 +97,27 @@ All but `/health` and the first four `/auth` routes need `Authorization: Bearer 
 | DELETE | /boards/&lt;id&gt; | admin | delete a board and its tasks |
 | GET | /tasks | member | one page: `?done=false&priority=high&q=notes&sort=-created_at&page=1&per_page=20` |
 | POST | /tasks | member | create: `{"title": "...", "priority": "high", "board_id": 1}` → 201 |
-| GET, PUT, PATCH, DELETE | /tasks/&lt;id&gt; | member | read, replace, change some fields, delete; another tenant's task is 404 |
-
-A tenant that stopped paying is read-only (403 on changes): `docker compose exec api flask --app wsgi set-active "Sharma Traders" false`.
+| GET, PUT, PATCH, DELETE | /tasks/&lt;id&gt; | member | read, replace (fields left out go back to defaults), change some fields, delete; another tenant's task is 404 |
 
 Errors are JSON: `{"error": "invalid input", "details": [{"field": "title", "message": "Field required"}]}`.
+
+| status | means |
+|---|---|
+| 400 | the body or query is wrong; `details` says which field |
+| 401 | no token, a bad one, an expired one, or logged out |
+| 403 | your role or plan does not allow it, or the tenant stopped paying (read-only) |
+| 404 | no such thing in *your* tenant |
+| 429 | too many requests: the gateway's rate limit |
+
+A tenant that stopped paying is read-only: `docker compose exec api flask --app wsgi set-active "Sharma Traders" false`.
+
+## See what is going on
+
+    docker compose ps                    # the four services and their health
+    docker compose logs -f gateway       # one JSON line per request: status, tenant, user, time
+    docker compose logs -f api
+    docker compose exec db psql -U taskboard -c "SELECT id, tenant_id, title, done FROM tasks"
+    docker compose exec redis redis-cli keys '*'
 
 ## Work on the API without Docker
 
@@ -88,9 +125,7 @@ Errors are JSON: `{"error": "invalid input", "details": [{"field": "title", "mes
     python3 -m venv .venv
     . .venv/bin/activate
     pip install -r requirements-dev.txt
-    pytest
-    flask --app wsgi db upgrade      # makes taskboard.db (SQLite) from the migrations
-    flask --app wsgi run
+    pytest                           # the tests use SQLite and a fake Redis: nothing else to start
 
-A new model field needs a migration: `flask --app wsgi db migrate -m "what changed"`, read the file it writes
-in `api/migrations/versions/`, then `flask --app wsgi db upgrade`.
+A new model field needs a migration: `flask --app wsgi db migrate -m "what changed"` (against `DATABASE_URL`,
+SQLite by default) writes a file in `api/migrations/versions/`. Read it, then `flask --app wsgi db upgrade`.
