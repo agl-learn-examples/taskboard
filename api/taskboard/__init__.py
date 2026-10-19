@@ -5,6 +5,7 @@ their own app with their own settings.
 """
 from flask import Flask
 
+from . import cache
 from .config import Config
 from .extensions import db, migrate
 
@@ -18,6 +19,7 @@ def create_app(config=None):
 
     db.init_app(app)
     migrate.init_app(app, db)
+    cache.init_app(app)
 
     from . import errors
     errors.register(app)

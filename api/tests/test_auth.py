@@ -69,3 +69,23 @@ def test_verify_for_the_gateway(client, tenant):
 
 def test_me(client, tenant):
     assert client.get("/auth/me", headers=tenant).get_json()["user"]["email"] == "priya@blueleaf.example"
+
+
+def pair_for(client, email="priya@blueleaf.example"):
+    return client.post("/auth/login", json={"email": email, "password": "test-password-1"}).get_json()
+
+
+def test_refresh_token_works_once(client, tenant):
+    pair = pair_for(client)
+    assert client.post("/auth/refresh", json={"refresh_token": pair["refresh_token"]}).status_code == 200
+    r = client.post("/auth/refresh", json={"refresh_token": pair["refresh_token"]})
+    assert r.status_code == 401
+
+
+def test_logout(client, tenant):
+    pair = pair_for(client)
+    h = {"Authorization": "Bearer " + pair["access_token"]}
+    assert client.post("/auth/logout", json={"refresh_token": pair["refresh_token"]}, headers=h).status_code == 204
+    assert client.get("/tasks", headers=h).get_json() == {"error": "logged out"}
+    assert client.get("/auth/verify", headers=h).status_code == 401
+    assert client.post("/auth/refresh", json={"refresh_token": pair["refresh_token"]}).status_code == 401

@@ -5,6 +5,7 @@ The tenant comes from the token, never from anything else the client sends.
 """
 from flask import request
 
+from . import cache
 from .errors import ApiError
 from .extensions import db
 from .models import Tenant, User
@@ -22,12 +23,21 @@ def current_user():
     """the logged-in user, worked out once per request"""
     if "taskboard.user" not in request.environ:
         claims = decode(bearer_token(), "access")
+        if is_revoked(claims):
+            raise ApiError(401, "logged out")
         user = db.session.get(User, int(claims["sub"]))
         if user is None:
             raise ApiError(401, "user no longer exists")
         request.environ["taskboard.user"] = user
         request.environ["taskboard.claims"] = claims
     return request.environ["taskboard.user"]
+
+
+def is_revoked(claims):
+    try:
+        return bool(cache.r().exists(f"revoked:{claims['jti']}"))
+    except cache.redis.RedisError:
+        return False             # Redis down: a logged-out token works until it expires (at most 15 min)
 
 
 def current_tenant():
@@ -37,6 +47,6 @@ def current_tenant():
 def writable_tenant():
     """the tenant, if it may change data: a tenant that stopped paying is read-only"""
     tenant = current_tenant()
-    if not tenant.active:
+    if not cache.tenant_status(tenant)["active"]:
         raise ApiError(403, "subscription inactive: your tasks are read-only")
     return tenant

@@ -8,6 +8,7 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     # The key that signs login tokens. Anyone who has it can make tokens for any user: in real life it
     # comes from a secret store, never from git. The default only works for practice on your laptop.
+    REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     JWT_SECRET = os.environ.get("JWT_SECRET", "dev-only-insecure-secret-change-me-0000")
     BCRYPT_ROUNDS = 12                     # each +1 doubles the work; tests use 4 to run fast
     ACCESS_TOKEN_MINUTES = int(os.environ.get("ACCESS_TOKEN_MINUTES", 15))
