@@ -9,6 +9,7 @@ from .extensions import db
 PLANS = ("free", "team")
 PLAN_MEMBER_LIMIT = {"free": 3, "team": None}       # None: no limit
 PRIORITIES = ("low", "normal", "high")
+ROLES = ("member", "admin", "owner")      # each can do what the ones before it can, and more
 
 
 def now():
@@ -35,12 +36,15 @@ class User(db.Model):
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
     name: Mapped[str] = mapped_column(String(100))
+    # bcrypt hash of the password, never the password itself; NULL: this user cannot log in yet
+    password_hash: Mapped[str | None] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(10), default="member", server_default="member")
     created_at: Mapped[datetime] = mapped_column(default=now)
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
 
     def to_dict(self):
-        return {"id": self.id, "email": self.email, "name": self.name}
+        return {"id": self.id, "email": self.email, "name": self.name, "role": self.role}
 
 
 class Board(db.Model):

@@ -2,20 +2,12 @@ from flask import Blueprint
 
 from ..errors import ApiError
 from ..extensions import db
-from ..models import PLAN_MEMBER_LIMIT, Tenant, User
+from ..models import PLAN_MEMBER_LIMIT, User
 from ..tenancy import current_tenant, writable_tenant
-from ..validation import MemberIn, TenantIn, parse
+from ..security import hash_password
+from ..validation import MemberIn, parse
 
 bp = Blueprint("tenants", __name__, url_prefix="/tenants")
-
-
-@bp.post("")
-def create_tenant():
-    data = parse(TenantIn)
-    tenant = Tenant(name=data.name, plan=data.plan)
-    db.session.add(tenant)
-    db.session.commit()
-    return tenant.to_dict(), 201
 
 
 @bp.get("/me")
@@ -40,7 +32,8 @@ def add_member():
                        code="upgrade_required")
     if db.session.scalar(db.select(User).filter_by(email=data.email.lower())):
         raise ApiError(409, "a user with this email already exists")
-    user = User(tenant_id=tenant.id, email=data.email.lower(), name=data.name)
+    user = User(tenant_id=tenant.id, email=data.email.lower(), name=data.name,
+                password_hash=hash_password(data.password), role=data.role)
     db.session.add(user)
     db.session.commit()
     return user.to_dict(), 201

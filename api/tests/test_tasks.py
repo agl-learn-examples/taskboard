@@ -1,3 +1,6 @@
+from conftest import signup
+
+
 def test_create_and_get(client, tenant):
     r = client.post("/tasks", json={"title": "Write notes"}, headers=tenant)
     assert r.status_code == 201
@@ -37,8 +40,8 @@ def test_delete(client, tenant):
 
 def test_other_tenants_task_is_not_found(client, tenant):
     client.post("/tasks", json={"title": "secret plan"}, headers=tenant)
-    other = client.post("/tenants", json={"name": "Sharma Traders"}).get_json()
-    r = client.get("/tasks/1", headers={"X-Tenant-ID": str(other["id"])})
+    other = signup(client, "Sharma Traders", "ravi@sharma.example")
+    r = client.get("/tasks/1", headers=other)
     assert r.status_code == 404
 
 

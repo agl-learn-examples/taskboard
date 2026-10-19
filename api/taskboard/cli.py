@@ -3,6 +3,10 @@ import click
 
 from .extensions import db
 from .models import Board, Task, Tenant, User
+from .security import hash_password
+
+# A FAKE practice password for every demo user. Never use it for anything real.
+DEMO_PASSWORD = "demo-password-123"
 
 
 def register(app):
@@ -16,10 +20,12 @@ def register(app):
         sharma = Tenant(name="Sharma Traders", plan="free")
         db.session.add_all([blueleaf, sharma])
         db.session.flush()
+        pw = hash_password(DEMO_PASSWORD)
         db.session.add_all([
-            User(tenant_id=blueleaf.id, email="priya@blueleaf.example", name="Priya"),
-            User(tenant_id=blueleaf.id, email="arjun@blueleaf.example", name="Arjun"),
-            User(tenant_id=sharma.id, email="ravi@sharma.example", name="Ravi"),
+            User(tenant_id=blueleaf.id, email="priya@blueleaf.example", name="Priya", role="owner", password_hash=pw),
+            User(tenant_id=blueleaf.id, email="arjun@blueleaf.example", name="Arjun", role="admin", password_hash=pw),
+            User(tenant_id=blueleaf.id, email="meera@blueleaf.example", name="Meera", role="member", password_hash=pw),
+            User(tenant_id=sharma.id, email="ravi@sharma.example", name="Ravi", role="owner", password_hash=pw),
         ])
         board = Board(tenant_id=blueleaf.id, name="Website launch")
         db.session.add(board)
@@ -29,4 +35,5 @@ def register(app):
             db.session.add(Task(tenant_id=blueleaf.id, board_id=board.id, title=title, priority=prio))
         db.session.add(Task(tenant_id=sharma.id, title="Order stock", priority="high"))
         db.session.commit()
-        click.echo(f"seeded: BlueLeaf Studio (tenant {blueleaf.id}), Sharma Traders (tenant {sharma.id})")
+        click.echo(f"seeded: BlueLeaf Studio (tenant {blueleaf.id}), Sharma Traders (tenant {sharma.id}); "
+                   f"every demo user's password is {DEMO_PASSWORD}")

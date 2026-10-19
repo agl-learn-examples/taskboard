@@ -20,14 +20,19 @@ class Body(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)   # unknown fields are an error
 
 
-class TenantIn(Body):
-    name: str = Name
-    plan: Literal["free", "team"] = "free"
-
-
 class MemberIn(Body):
     email: EmailStr
     name: str = Name
+    password: str = Field(min_length=8, max_length=72)       # bcrypt reads at most 72 bytes
+    role: Literal["member", "admin"] = "member"
+
+
+class SignupIn(Body):
+    """a new customer: their tenant, and its first user, the owner"""
+    tenant_name: str = Name
+    name: str = Name
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
 
 
 class BoardIn(Body):

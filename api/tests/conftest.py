@@ -22,5 +22,11 @@ def client(app):
 @pytest.fixture
 def tenant(client):
     """a fresh tenant; returns the headers that act as it"""
-    t = client.post("/tenants", json={"name": "BlueLeaf Studio", "plan": "team"}).get_json()
-    return {"X-Tenant-ID": str(t["id"])}
+    return signup(client, "BlueLeaf Studio", "priya@blueleaf.example")
+
+
+def signup(client, tenant_name, email):
+    r = client.post("/auth/signup", json={"tenant_name": tenant_name, "name": "Owner", "email": email,
+                                          "password": "test-password-1"})
+    assert r.status_code == 201, r.get_json()
+    return {"X-Tenant-ID": str(r.get_json()["tenant"]["id"])}

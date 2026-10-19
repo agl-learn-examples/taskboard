@@ -22,8 +22,9 @@ def create_app(config=None):
     from . import errors
     errors.register(app)
 
-    from .blueprints import boards, health, tasks, tenants
+    from .blueprints import auth, boards, health, tasks, tenants
     app.register_blueprint(health.bp)
+    app.register_blueprint(auth.bp)
     app.register_blueprint(tenants.bp)
     app.register_blueprint(boards.bp)
     app.register_blueprint(tasks.bp)
