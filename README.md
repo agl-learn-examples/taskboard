@@ -22,10 +22,10 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 | web app | `web/` | Angular | A5 (later) |
 | phone app | `mobile/` | Flutter | A6 (later) |
 
-## You are at tag `b2-pytest`
+## Where you are
 
-Course B2, *Pytest from zero*: the API has a test suite to learn from (`api/tests/`), with fixtures, parametrize,
-mocking and coverage. The app is the same as at `a4-gateway`.
+`main` is the latest: everything up to Course B3, *API testing*. To see the code as a lesson saw it, check out
+that lesson's tag (below).
 
 ## Run it (one command)
 
@@ -72,7 +72,7 @@ database may be from another tag) and start again as the README at that tag says
 | `a3-auth` | A3 · Security: logins and JWT | bcrypt passwords, JWT access and refresh tokens, roles, Redis sessions and logout |
 | `a4-gateway` | A4 · The API gateway | nginx in front: routing, token check, rate limits, JSON logs; one-command stack |
 | `b2-pytest` | B2 · Pytest from zero | the test suite: fixtures, parametrize, mocking, coverage |
-| `b3-api-tests` | B3 · API testing | (coming) httpx tests against the running stack, in CI |
+| `b3-api-tests` | B3 · API testing | httpx tests against the running stack: logins, contracts, tenants, rate limits; in CI |
 
 ## Endpoints
 
@@ -136,7 +136,19 @@ A tenant that stopped paying is read-only: `docker compose exec api flask --app 
 | `api/tests/` | the API service through Flask's test client, with a fresh database per test | `test_auth.py`, `test_roles.py` |
 | `api/tests/conftest.py` | shared fixtures: `app`, `client`, `tenant` (a signed-up, logged-in owner) | |
 
-GitHub Actions runs them on every push and pull request (`.github/workflows/ci.yml`).
+### API tests: the running stack, over HTTP
+
+`tests/` (at the top of the repo) sends real requests through the gateway, as the web and phone apps will.
+Each test signs up its own new tenant, so tests never share data.
+
+    AUTH_RATE=600r/m AUTH_BURST=100 docker compose up -d --build --wait    # login limit raised for the tests
+    python3 -m venv .venv && . .venv/bin/activate
+    pip install -r tests/requirements.txt
+    pytest tests
+    docker compose down -v
+
+GitHub Actions runs both kinds on every push and pull request (`.github/workflows/ci.yml`): first the API
+service's tests, then the API tests against the whole stack.
 
 ## Work on the API without Docker
 
