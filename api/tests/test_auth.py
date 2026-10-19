@@ -64,7 +64,9 @@ def test_verify_for_the_gateway(client, tenant):
     r = client.get("/auth/verify", headers=tenant)
     assert r.status_code == 204
     assert r.headers["X-Tenant-Id"] == "1"
-    assert client.get("/auth/verify").status_code == 401
+    r = client.get("/auth/verify")
+    assert r.status_code == 401
+    assert r.headers["X-Auth-Error"].startswith("log in first")
 
 
 def test_me(client, tenant):

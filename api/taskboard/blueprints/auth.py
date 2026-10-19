@@ -88,7 +88,10 @@ def me():
 def verify():
     """For the gateway: is this a valid, unexpired access token? 204 yes, 401 no. Checks the signature
     only (no database), so it is fast; it hands who-is-asking on in headers."""
-    claims = decode(bearer_token(), "access")
-    if is_revoked(claims):
-        raise ApiError(401, "logged out")
+    try:
+        claims = decode(bearer_token(), "access")
+        if is_revoked(claims):
+            raise ApiError(401, "logged out")
+    except ApiError as e:            # the gateway cannot read a body here, so the reason goes in a header
+        return {"error": e.message}, 401, {"X-Auth-Error": e.message}
     return "", 204, {"X-User-Id": claims["sub"], "X-Tenant-Id": str(claims["tid"]), "X-Role": claims["role"]}
