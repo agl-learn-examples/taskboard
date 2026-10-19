@@ -4,10 +4,11 @@ bcrypt is slow on purpose (about a quarter of a second), and mixes a random salt
 users with the same password get different hashes, and a stolen table is very slow to crack.
 """
 import bcrypt
+from flask import current_app
 
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(current_app.config["BCRYPT_ROUNDS"])).decode()
 
 
 def check_password(password: str, hashed: str | None) -> bool:

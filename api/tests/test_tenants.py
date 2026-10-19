@@ -38,7 +38,7 @@ def test_free_plan_allows_three_members(client):
 def test_inactive_tenant_is_read_only(app, client, tenant):
     from taskboard.extensions import db
     from taskboard.models import Tenant
-    db.session.get(Tenant, int(tenant["X-Tenant-ID"])).active = False
+    db.session.get(Tenant, 1).active = False
     db.session.commit()
     assert client.get("/tasks", headers=tenant).status_code == 200
     assert client.post("/tasks", json={"title": "x"}, headers=tenant).status_code == 403

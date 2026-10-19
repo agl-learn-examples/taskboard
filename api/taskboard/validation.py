@@ -35,6 +35,15 @@ class SignupIn(Body):
     password: str = Field(min_length=8, max_length=72)
 
 
+class LoginIn(Body):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=72)
+
+
+class RefreshIn(Body):
+    refresh_token: str
+
+
 class BoardIn(Body):
     name: str = Name
 

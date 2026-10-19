@@ -8,7 +8,7 @@ from taskboard.extensions import db
 
 @pytest.fixture
 def app(tmp_path):
-    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}"})
+    app = create_app({"TESTING": True, "BCRYPT_ROUNDS": 4, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}"})
     with app.app_context():
         db.create_all()          # tests make the tables from the models; Docker uses the migrations
         yield app
@@ -29,4 +29,11 @@ def signup(client, tenant_name, email):
     r = client.post("/auth/signup", json={"tenant_name": tenant_name, "name": "Owner", "email": email,
                                           "password": "test-password-1"})
     assert r.status_code == 201, r.get_json()
-    return {"X-Tenant-ID": str(r.get_json()["tenant"]["id"])}
+    return login(client, email)
+
+
+def login(client, email, password="test-password-1"):
+    """the headers of a logged-in user"""
+    r = client.post("/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.get_json()
+    return {"Authorization": "Bearer " + r.get_json()["access_token"]}
