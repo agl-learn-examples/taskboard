@@ -14,6 +14,8 @@ def app(tmp_path):
     with app.app_context():
         db.create_all()          # tests make the tables from the models; Docker uses the migrations
         yield app
+        db.session.remove()
+        db.engine.dispose()      # close the test database's connections
 
 
 @pytest.fixture
