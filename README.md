@@ -20,11 +20,11 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 | Postgres | (image) | the database: tenants, users, boards, tasks | A2 |
 | Redis | (image) | fast, short-lived data: sessions, logged-out tokens, cached plans | A3 |
 | web app | `web/` | Angular: log in, list, add and change tasks; served by the gateway | A5 |
-| phone app | `mobile/` | Flutter | A6 (later) |
+| phone app | `mobile/` | Flutter: task list, login, tokens in secure storage | A6 |
 
 ## Where you are
 
-`main` is the latest: everything up to Course A5, *Web front end with Angular*. To see the code as a lesson saw it, check out
+`main` is the latest: everything up to Course A6, *Mobile app with Flutter*. To see the code as a lesson saw it, check out
 that lesson's tag (below).
 
 ## Run it (one command)
@@ -76,6 +76,7 @@ database may be from another tag) and start again as the README at that tag says
 | `b2-pytest` | B2 · Pytest from zero | the test suite: fixtures, parametrize, mocking, coverage |
 | `b3-api-tests` | B3 · API testing | httpx tests against the running stack: logins, contracts, tenants, rate limits; in CI |
 | `a5-angular` | A5 · Web front end with Angular | the web app in `web/`: task list, form, login; served by the gateway at `/` |
+| `a6-flutter` | A6 · Mobile app with Flutter | `mobile/`: task list, `ApiClient`, login with tokens in secure storage, logout; tests |
 
 ## Endpoints
 
@@ -185,6 +186,55 @@ What it does, page by page:
 Kept simple on purpose: no automatic token refresh (after 15 minutes the API answers 401 and the app sends
 you back to the login page), only the first 100 tasks, no boards, no delete button. Pages have
 `data-testid` attributes and labelled fields so Course B4's Playwright tests can find them.
+
+## Course A6: the mobile app
+
+`mobile/` is TaskBoard's phone app, in [Flutter](https://flutter.dev): log in, see your team's tasks, log out.
+It calls the API through the gateway, like any other client. `mobile/README.md` says which file does what.
+
+### Install Flutter
+
+Follow [the Flutter install guide](https://docs.flutter.dev/get-started/install) for your computer, then run
+`flutter doctor`: it lists what is still missing. The app was built with Flutter 3.47 (Dart 3.13). You do not
+need Android Studio to start: the Linux desktop or Chrome is enough. On Linux, the secure storage needs
+libsecret: `sudo apt install libsecret-1-dev`.
+
+### Run it against the stack
+
+    docker compose up -d --build --wait      # the whole stack, in the repo's top folder
+    cd mobile
+    flutter pub get                          # download the packages: http, flutter_secure_storage
+    flutter run -d linux                     # a phone-sized window on the Linux desktop
+
+Log in as `priya@blueleaf.example`, password `demo-password-123`. Close the app and start it again: you are
+still logged in, because the tokens wait in secure storage. Log out with the button at the top right.
+
+The app finds the gateway at `http://localhost:8080`. Somewhere else, say so when you start it:
+
+| where the app runs | start it with |
+|---|---|
+| Linux, macOS or Windows desktop | `flutter run` (the default address works) |
+| Android emulator | `flutter run --dart-define=API_BASE=http://10.0.2.2:8080` (the emulator's name for your laptop) |
+| a real phone on your Wi-Fi | `flutter run --dart-define=API_BASE=http://<your laptop's IP>:8080` |
+| Chrome | `flutter run -d chrome --web-browser-flag=--disable-web-security` (see below) |
+
+In Chrome the app is served from another address than the gateway (`localhost:53211`, say, not
+`localhost:8080`), and browsers block such calls unless the server allows them (CORS). The gateway does not,
+so for practice the flag above turns that check off in the Chrome window Flutter opens. Never browse other
+sites in that window.
+
+### Test it
+
+    cd mobile
+    flutter test                                  # unit and widget tests with a fake API: no server needed
+    flutter test integration_test -d linux        # the whole app against the running stack
+
+| where | what | example |
+|---|---|---|
+| `mobile/test/task_test.dart` | unit tests: JSON to a `Task` | a task with no board; a task without a title is refused |
+| `mobile/test/api_client_test.dart` | `ApiClient` against a fake server (`MockClient`) | the token is sent; the API's error message is shown |
+| `mobile/test/task_list_screen_test.dart` | widget tests: the list screen with a fake `ApiClient` | spinner, then tasks; "No tasks yet"; error and "Try again" |
+| `mobile/integration_test/` | the real app, the real stack | log in as Priya, see her tasks (not Sharma's), log out |
 
 ## Work on the API without Docker
 
