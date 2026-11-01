@@ -64,3 +64,38 @@ jobs:
         run: docker compose logs
       - if: always()
         run: docker compose down -v
+
+  e2e:
+    # Course B4: Playwright drives a real Chromium through the web app, against the whole stack in Compose
+    needs: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/e2e
+    env:
+      AUTH_RATE: 600r/m          # the same raised login limit as api-tests, so a retry never meets a 429
+      AUTH_BURST: 100
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose up -d --build --wait
+        working-directory: .
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          retention-days: 14
+      - if: failure()
+        run: docker compose logs
+        working-directory: .
+      - if: always()
+        run: docker compose down -v
+        working-directory: .
