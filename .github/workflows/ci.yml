@@ -27,7 +27,7 @@ jobs:
       # Course B5: a JUnit XML report (every test, pass or fail) and a coverage report, kept as artifacts
       - run: pytest -q --cov --cov-report=xml --cov-report=html --junitxml=pytest-report.xml
       - if: always()
-        run: echo "Python ${{ matrix.python-version }}: coverage $(coverage report --format=total)%" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Python ${{ matrix.python-version }}, coverage $(coverage report --format=total)%" >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
