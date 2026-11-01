@@ -1,0 +1,39 @@
+<section aria-labelledby="form-heading">
+  <h1 id="form-heading">{{ id() ? 'Edit task' : 'New task' }}</h1>
+
+  <form [formGroup]="form" (ngSubmit)="save()" data-testid="task-form" novalidate>
+    <label for="title">Title</label>
+    <input id="title" formControlName="title" data-testid="task-title-input" autocomplete="off" />
+    @if (form.controls.title.touched && form.controls.title.invalid) {
+      <p class="field-error" data-testid="title-error">
+        @if (form.controls.title.hasError('maxlength')) {
+          The title can be at most 200 characters.
+        } @else {
+          The title is required.
+        }
+      </p>
+    }
+
+    <label for="priority">Priority</label>
+    <select id="priority" formControlName="priority" data-testid="task-priority-select">
+      @for (p of priorities; track p) {
+        <option [value]="p">{{ p }}</option>
+      }
+    </select>
+
+    @if (id()) {
+      <label class="inline">
+        <input type="checkbox" formControlName="done" data-testid="task-done-checkbox" /> Done
+      </label>
+    }
+
+    @if (error()) {
+      <p role="alert" class="error">{{ error() }}</p>
+    }
+
+    <div class="row">
+      <button type="submit" [disabled]="saving()" data-testid="task-save">Save</button>
+      <a routerLink="/tasks">Cancel</a>
+    </div>
+  </form>
+</section>

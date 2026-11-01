@@ -1,0 +1,9 @@
+<input
+  type="checkbox"
+  [checked]="task().done"
+  (change)="toggled.emit(task())"
+  [attr.aria-label]="'Done: ' + task().title"
+/>
+<span class="title" data-testid="task-title">{{ task().title }}</span>
+<span class="priority {{ task().priority }}" data-testid="task-priority">{{ task().priority }}</span>
+<a [routerLink]="['/tasks', task().id, 'edit']" [attr.aria-label]="'Edit ' + task().title">Edit</a>

@@ -1,0 +1,13 @@
+<header>
+  <a routerLink="/tasks" class="brand">TaskBoard</a>
+  @if (auth.isLoggedIn()) {
+    <nav>
+      <a routerLink="/tasks">Tasks</a>
+      <a routerLink="/tasks/new">New task</a>
+      <button type="button" (click)="logout()" data-testid="logout">Log out</button>
+    </nav>
+  }
+</header>
+<main>
+  <router-outlet />
+</main>

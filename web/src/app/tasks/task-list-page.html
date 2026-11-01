@@ -1,0 +1,23 @@
+<section aria-labelledby="tasks-heading">
+  <div class="row">
+    <h1 id="tasks-heading">Tasks</h1>
+    <a routerLink="/tasks/new" class="button" data-testid="new-task">New task</a>
+  </div>
+
+  @if (error()) {
+    <p role="alert" class="error">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <p>Loading…</p>
+  } @else {
+    <ul class="task-list" data-testid="task-list" aria-label="Tasks">
+      @for (task of items(); track task.id) {
+        <li app-task-item [task]="task" (toggled)="toggle($event)"></li>
+      } @empty {
+        <li>No tasks yet.</li>
+      }
+    </ul>
+    <p class="muted" data-testid="task-count">{{ items().length }} of {{ total() }} tasks</p>
+  }
+</section>
