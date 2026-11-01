@@ -1,5 +1,5 @@
 """The tables. Every row that belongs to a customer carries tenant_id: that is what keeps tenants apart."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,7 +13,7 @@ ROLES = ("member", "admin", "owner")      # each can do what the ones before it 
 
 
 def now():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Tenant(db.Model):

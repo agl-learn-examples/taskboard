@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flask import Blueprint, request
 
 from .. import cache
-
 from ..errors import ApiError
 from ..extensions import db
 from ..models import Tenant, User
@@ -16,7 +15,7 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
 def seconds_left(claims):
-    return max(1, int(claims["exp"] - datetime.now(timezone.utc).timestamp()))
+    return max(1, int(claims["exp"] - datetime.now(UTC).timestamp()))
 
 
 def token_pair(user):

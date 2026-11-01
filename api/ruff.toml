@@ -1,0 +1,3 @@
+# ruff: the linter for api/ (Course B5). `ruff check .` in api/; CI's lint job runs the same.
+# We use ruff's default rules as they are, so there is nothing to argue about: only the Python version is set.
+target-version = "py312"

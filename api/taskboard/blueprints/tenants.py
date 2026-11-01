@@ -4,8 +4,8 @@ from .. import cache
 from ..errors import ApiError
 from ..extensions import db
 from ..models import PLAN_MEMBER_LIMIT, User
-from ..tenancy import current_tenant, require_role, writable_tenant
 from ..security import hash_password
+from ..tenancy import current_tenant, require_role, writable_tenant
 from ..validation import MemberIn, PlanIn, parse
 
 bp = Blueprint("tenants", __name__, url_prefix="/tenants")

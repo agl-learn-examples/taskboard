@@ -29,7 +29,7 @@ def test_expired(app_ctx):
 
 
 def test_changed_payload_breaks_the_signature(app_ctx):
-    token, claims = make_access(PRIYA)
+    _, claims = make_access(PRIYA)
     forged = jwt.encode({**claims, "tid": 8}, "not-the-server-key-but-long-enough!", algorithm="HS256")
     with pytest.raises(ApiError, match="invalid token"):
         decode(forged, "access")

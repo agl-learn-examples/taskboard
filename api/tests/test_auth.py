@@ -1,5 +1,4 @@
 import jwt
-
 from conftest import signup
 
 

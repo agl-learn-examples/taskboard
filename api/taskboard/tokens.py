@@ -8,7 +8,7 @@ without the server's key: the signature would no longer match.
   refresh token  long-lived (7 days); sent only to POST /auth/refresh, to get a new access token
 """
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from flask import current_app
@@ -19,7 +19,7 @@ ALGORITHM = "HS256"
 
 
 def _make(user, kind, lifetime):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims = {"sub": str(user.id), "tid": user.tenant_id, "role": user.role, "type": kind,
               "jti": uuid.uuid4().hex, "iat": now, "exp": now + lifetime}
     return jwt.encode(claims, current_app.config["JWT_SECRET"], algorithm=ALGORITHM), claims
