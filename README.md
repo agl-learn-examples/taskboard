@@ -24,7 +24,7 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 
 ## Where you are
 
-`main` is the latest: everything up to Course A6, *Mobile app with Flutter*. To see the code as a lesson saw it, check out
+`main` is the latest: everything up to Course B4, *Web testing with Playwright*. To see the code as a lesson saw it, check out
 that lesson's tag (below).
 
 ## Run it (one command)
@@ -77,6 +77,7 @@ database may be from another tag) and start again as the README at that tag says
 | `b3-api-tests` | B3 · API testing | httpx tests against the running stack: logins, contracts, tenants, rate limits; in CI |
 | `a5-angular` | A5 · Web front end with Angular | the web app in `web/`: task list, form, login; served by the gateway at `/` |
 | `a6-flutter` | A6 · Mobile app with Flutter | `mobile/`: task list, `ApiClient`, login with tokens in secure storage, logout; tests |
+| `b4-playwright` | B4 · Web testing with Playwright | `tests/e2e/`: browser tests of the web app (login, tasks, the guard), a page object; in CI |
 
 ## Endpoints
 
@@ -152,7 +153,7 @@ Each test signs up its own new tenant, so tests never share data.
     docker compose down -v
 
 GitHub Actions runs both kinds on every push and pull request (`.github/workflows/ci.yml`): first the API
-service's tests, then the API tests against the whole stack. It also runs the web app's unit tests (A5).
+service's tests, then the API tests against the whole stack. It also runs the web app's unit tests (A5) and the browser tests (B4).
 
 ## Course A5: the web app
 
@@ -235,6 +236,58 @@ sites in that window.
 | `mobile/test/api_client_test.dart` | `ApiClient` against a fake server (`MockClient`) | the token is sent; the API's error message is shown |
 | `mobile/test/task_list_screen_test.dart` | widget tests: the list screen with a fake `ApiClient` | spinner, then tasks; "No tasks yet"; error and "Try again" |
 | `mobile/integration_test/` | the real app, the real stack | log in as Priya, see her tasks (not Sharma's), log out |
+
+## Course B4: browser tests
+
+`tests/e2e/` holds end-to-end tests: [Playwright](https://playwright.dev) opens a real Chromium, goes to
+the web app through the gateway and clicks, types and checks what the page shows, as a person would. The
+page, the gateway, the API and the database all have to work together for them to pass.
+
+    docker compose up -d --build --wait      # the whole stack, in the repo's top folder
+    cd tests/e2e
+    npm ci                                   # the exact versions in package-lock.json
+    npx playwright install --with-deps chromium   # the browser, once (--with-deps also asks for system libraries)
+    npx playwright test                      # every test, headless, one line each
+    npx playwright test --headed             # the same, with the browser window open
+    npx playwright test login                # only the files with "login" in their name
+    npx playwright show-report               # the HTML report of the last run, in your browser
+    cd ../.. && docker compose down -v       # stop the stack and delete its data
+
+The tests point at http://localhost:8080. Somewhere else? `BASE_URL=http://localhost:8081 npx playwright test`.
+
+| file | what it tests or does |
+|---|---|
+| `playwright.config.ts` | where the app is, Chromium only, a screenshot when a test fails, a trace when a test is retried |
+| `auth.setup.ts` | runs first: logs in as Priya once and saves the browser's storage to `playwright/.auth/` |
+| `login.spec.ts` | logging in shows the task list; a wrong password shows the error; logging out goes to `/login`; the guard sends `/tasks` to `/login` |
+| `tasks.spec.ts` | create a task, see it in the list, edit it, mark it done; the form will not save an empty title |
+| `pages/login-page.ts` | a page object: the login page's fields and button in one class, used by the setup and the login tests |
+
+The tests find things the way a user does: by role and visible name (`getByRole('button', { name: 'Save' })`),
+by label (`getByLabel('Title')`), and by the `data-testid` attributes the web app puts on its pages
+(`getByTestId('task-item')`). Never by CSS classes or page structure, which change when the design does.
+They never sleep: Playwright waits for each thing to appear, and `expect` keeps checking until it is true.
+
+**The login limit.** The gateway allows 10 logins a minute from one address (5 at once). So the tests do
+not log in each time: `auth.setup.ts` logs in once and every task test starts from that saved login. Only
+two login tests really log in (the right password, and the wrong one), so a run uses 3 logins and two runs
+in a row still pass with the normal limit. The logout test logs in on its own, because logging out ends that
+session on the server and would log out every test that shares it. CI raises the limit anyway
+(`AUTH_RATE=600r/m AUTH_BURST=100`, as for the API tests), so a retried test never meets a 429.
+
+Each task test's title ends with the time (`Write the release notes 1793...`), so running the tests again
+never trips over a task an earlier run made. The tasks pile up in BlueLeaf's list until `docker compose down -v`.
+
+**When a test fails** the report shows the step that failed, the error and a screenshot. To see every step,
+run with a trace and open it:
+
+    npx playwright test --trace on
+    npx playwright show-trace test-results/<the test's folder>/trace.zip
+
+The trace viewer shows each action with the page before and after it, the console and the network requests.
+In CI (`.github/workflows/ci.yml`, job `e2e`) a failed test is retried once with a trace, and the HTML report,
+traces included, is kept as the run's `playwright-report` artifact: download it, unzip it and run
+`npx playwright show-report <the folder>`.
 
 ## Work on the API without Docker
 
