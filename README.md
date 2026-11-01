@@ -24,7 +24,7 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 
 ## Where you are
 
-`main` is the latest: everything up to Course B4, *Web testing with Playwright*. To see the code as a lesson saw it, check out
+`main` is the latest: everything up to Course B5, *Tests in CI, and quality habits*. To see the code as a lesson saw it, check out
 that lesson's tag (below).
 
 ## Run it (one command)
@@ -78,6 +78,7 @@ database may be from another tag) and start again as the README at that tag says
 | `a5-angular` | A5 · Web front end with Angular | the web app in `web/`: task list, form, login; served by the gateway at `/` |
 | `a6-flutter` | A6 · Mobile app with Flutter | `mobile/`: task list, `ApiClient`, login with tokens in secure storage, logout; tests |
 | `b4-playwright` | B4 · Web testing with Playwright | `tests/e2e/`: browser tests of the web app (login, tasks, the guard), a page object; in CI |
+| `b5-quality` | B5 · Tests in CI, and quality habits | linters (ruff, ESLint) in CI, test reports as artifacts, a review checklist, a k6 performance test |
 
 ## Endpoints
 
@@ -288,6 +289,80 @@ The trace viewer shows each action with the page before and after it, the consol
 In CI (`.github/workflows/ci.yml`, job `e2e`) a failed test is retried once with a trace, and the HTML report,
 traces included, is kept as the run's `playwright-report` artifact: download it, unzip it and run
 `npx playwright show-report <the folder>`.
+
+## Course B5: quality in CI
+
+Every push and pull request runs `.github/workflows/ci.yml` on GitHub Actions. Each job is one kind of check;
+if any of them fails, the run is red and the pull request shows it.
+
+| job | what it runs | course |
+|---|---|---|
+| `test` | the API service's pytest tests, on Python 3.12 and 3.13 | B2 |
+| `lint` | ruff on `api/`, ESLint on `web/` | B5 |
+| `web` | the web app's unit tests (Vitest), then a production build | A5 |
+| `api-tests` | the whole stack in Compose, then HTTP tests through the gateway | B3 |
+| `e2e` | the whole stack, then Playwright in Chromium | B4 |
+
+### Reports
+
+A red run says *that* something failed; a report says *what*. Open the run on GitHub (the Actions tab) and
+scroll to **Artifacts**:
+
+| artifact | what is in it | kept |
+|---|---|---|
+| `pytest-report-3.12`, `pytest-report-3.13` | `pytest-report.xml` (JUnit XML: each test, passed or failed, and how long it took), `coverage.xml`, and `htmlcov/` (open `index.html`: every file, its missed lines in red) | always |
+| `playwright-report` | the browser tests' HTML report, with screenshots and traces | when a test fails |
+
+The run's summary page also shows the coverage total for each Python version. JUnit XML is the format almost
+every CI tool reads, so the same file works in GitLab or Jenkins. To make the reports on your laptop:
+
+    cd api
+    pytest --cov --cov-report=html --junitxml=pytest-report.xml     # then open htmlcov/index.html
+
+### Linting
+
+A linter reads the code without running it and points at likely mistakes: an unused import, a variable that is
+never used, an `except Exception:` that would hide a real bug. Fixing them is cheaper than reviewing them.
+
+    cd api
+    ruff check .              # ruff, with its default rules (api/ruff.toml sets only the Python version)
+    ruff check --fix .        # and fix what it can fix by itself (import order, for example)
+
+    cd web
+    npm run lint              # ESLint with Angular's rules (eslint.config.js, made by `ng add angular-eslint`)
+
+The `lint` job runs both, and one finding fails the build. In a pull request, ruff's findings also show on the
+lines they are about. When the linter is wrong for one line, say so on that line and say why:
+`# noqa: RUF012 (Flask only reads it)` in `api/taskboard/config.py`. Never switch a rule off for the whole project
+to make a red build green.
+
+### Code review
+
+`.github/pull_request_template.md` fills in every new pull request: what changed, why, and a short checklist for
+the author and for the reviewer. One line asks: *AI-assisted? Say which parts, and what you checked yourself.*
+Code an assistant wrote is your code once you open the pull request: run it and read every line.
+
+### Performance: k6
+
+`tests/perf/tasks-list.js` is a [k6](https://grafana.com/docs/k6/) test. It logs in once (in `setup()`), then 5
+virtual users ask for `GET /v1/tasks`, each about once a second, for 30 seconds. It passes when 95% of the
+requests answer in under 500 ms (`p(95)<500`) and fewer than 1% fail. You do not need to install k6: Docker
+runs it.
+
+    docker compose up -d --build --wait
+    docker run --rm -i --network host -v "$PWD/tests/perf:/perf" grafana/k6:2.3.0 run /perf/tasks-list.js
+    docker compose down -v
+
+`--network host` lets the k6 container reach `localhost:8080` on Linux. On macOS or Windows (Docker Desktop),
+leave it out and add `-e BASE_URL=http://host.docker.internal:8080`. Change the load with `-e VUS=20` or
+`-e DURATION=1m`.
+
+On a laptop, 5 users give p95 of about 20 ms and no errors. With `-e VUS=20` almost half the requests fail
+with 429: the gateway allows 10 requests a second from one address, so the test finds the rate limit, not a
+slow API. That is a real result too: a performance test measures the whole path, gateway included.
+
+It is not in the CI run for every push: it takes time, and a shared CI machine gives noisy numbers. Run it by
+hand from the Actions tab (workflow **Performance**, button **Run workflow**, `.github/workflows/perf.yml`).
 
 ## Work on the API without Docker
 

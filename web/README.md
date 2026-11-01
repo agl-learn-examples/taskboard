@@ -17,6 +17,7 @@ libraries). It talks to the API only through the gateway, at `/v1/...`.
 | `src/app/auth/auth.guard.ts` | pages that need a login send you to `/login` | 5 |
 | `src/app/**/*.spec.ts` | unit tests: the task row and the auth service | |
 | `proxy.conf.json` | in development, sends `/v1` to the gateway on port 8080 | |
+| `eslint.config.js` | the linter's rules: `npm run lint` (Course B5) | |
 | `Dockerfile` | builds the app and puts the files into the gateway's nginx | |
 
 See the top-level README, *Course A5: the web app*, for how to run it.
