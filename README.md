@@ -24,7 +24,7 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 
 ## Where you are
 
-`main` is the latest: everything up to Course B5, *Tests in CI, and quality habits*. To see the code as a lesson saw it, check out
+`main` is the latest: everything up to Course A7, *Ship it: capstone*. To see the code as a lesson saw it, check out
 that lesson's tag (below).
 
 ## Run it (one command)
@@ -79,6 +79,7 @@ database may be from another tag) and start again as the README at that tag says
 | `a6-flutter` | A6 · Mobile app with Flutter | `mobile/`: task list, `ApiClient`, login with tokens in secure storage, logout; tests |
 | `b4-playwright` | B4 · Web testing with Playwright | `tests/e2e/`: browser tests of the web app (login, tasks, the guard), a page object; in CI |
 | `b5-quality` | B5 · Tests in CI, and quality habits | linters (ruff, ESLint) in CI, test reports as artifacts, a review checklist, a k6 performance test |
+| `a7-ship` | A7 · Ship it: capstone | pinned base images, HTTPS at the gateway (`compose.https.yaml`), `scripts/status.sh` |
 
 ## Endpoints
 
@@ -363,6 +364,89 @@ slow API. That is a real result too: a performance test measures the whole path,
 
 It is not in the CI run for every push: it takes time, and a shared CI machine gives noisy numbers. Run it by
 hand from the Actions tab (workflow **Performance**, button **Run workflow**, `.github/workflows/perf.yml`).
+
+## Course A7: ship it
+
+Shipping means: the same images every time, tests that guard every change, HTTPS in front, and a way to see that
+the live app is well.
+
+### 1. Docker images
+
+Each part that is ours has a Dockerfile: `api/Dockerfile` (Python and gunicorn) and `web/Dockerfile` (Node builds
+the web app, then nginx serves it; this image is the gateway). Compose builds both, or build one by hand and give
+it a tag, a name for this version:
+
+    docker build -t taskboard-api:a7 api/
+    docker build -t taskboard-gateway:a7 web/
+    docker images taskboard-api                  # the image, its tag and its size
+
+The base images are pinned to an exact version (`FROM python:3.12.16-slim-trixie`, `node:22.23.4-alpine3.24`,
+`nginx:1.30.6-alpine3.24`), and so are the packages (`requirements.txt`, `package-lock.json`). A tag like
+`python:3.12` moves when a new 3.12 comes out, so the same Dockerfile could build a different image next month.
+Stricter still is a digest (`python:3.12.16-slim-trixie@sha256:...`), which can never change.
+
+### 2. Tests in CI
+
+Every push runs the whole set on GitHub Actions: unit tests, lint, API tests and browser tests against the whole
+stack. See *Course B5: quality in CI* above. Ship only from a green `main`.
+
+### 3. HTTPS at the gateway
+
+HTTPS encrypts everything between the browser and the gateway, so nobody on the Wi-Fi can read a password or a
+token. The gateway (nginx) does it: it holds the certificate and the private key, decrypts each request, and
+passes it on to the API as before. On your laptop:
+
+    gateway/certs/make-dev-cert.sh                                        # once: a certificate for localhost
+    docker compose -f compose.yaml -f compose.https.yaml up -d --build --wait
+    curl -k https://localhost:8443/v1/health                             # -k: accept a self-signed certificate
+    curl -i http://localhost:8080/v1/health                               # 301, Location: https://localhost:8443/...
+
+Open https://localhost:8443. The browser warns first ("not private"): the certificate is self-signed, so nobody
+vouches for it. Accept it for this one practice site. `curl` without `-k` refuses it for the same reason.
+
+| file | what it does |
+|---|---|
+| `gateway/certs/make-dev-cert.sh` | `openssl` makes `localhost.crt` (the certificate) and `localhost.key` (the private key); both are in `.gitignore` |
+| `gateway/https.conf` | nginx: `listen 443 ssl`, the two files, and a 301 from http to https |
+| `compose.https.yaml` | adds port 8443, mounts the two files and `https.conf`, and checks health over https |
+
+Without `compose.https.yaml` nothing changes: plain http on port 8080, which the tests use. To always start
+with HTTPS, put `COMPOSE_FILE=compose.yaml:compose.https.yaml` in your `.env`.
+
+A real deployment uses a real certificate, from a certificate authority such as
+[Let's Encrypt](https://letsencrypt.org) (free), for a domain name you own. Browsers trust it, so there is no
+warning and no `-k`. The private key stays on the server, never in git.
+
+### 4. Monitoring the live app
+
+Three things tell you whether TaskBoard is well:
+
+| what | where | tells you |
+|---|---|---|
+| the health check | `GET /v1/health` | `{"status": "ok"}`, or 503 when the API cannot reach the database |
+| the containers | `docker compose ps` | each service up, and *healthy* (Compose runs each health check every few seconds) |
+| the access log | `docker compose logs gateway` | one JSON line per request: time, status, seconds, tenant, user, request id |
+
+`scripts/status.sh` shows all three at once, with counts from the last 5 minutes of the log:
+
+    scripts/status.sh                            # http://localhost:8080
+    scripts/status.sh https://localhost:8443     # with HTTPS
+
+It exits with 1 when the health check fails, so a cron job or a CI step can raise the alarm. Try it: stop the
+database (`docker compose stop db`), run it again, and see 503 and `UNHEALTHY`.
+
+Because each log line is JSON, a program can read it as well as you can. To see only the failures:
+
+    docker compose logs --no-log-prefix gateway | grep '"status":5'
+
+The `request_id` in a log line is also in the response's `X-Request-ID` header and in the request the API gets,
+so one id follows a request from the browser to the API's log. Bigger systems send these lines to a log service
+and draw charts from them; the lines are the same.
+
+### 5. Retell and reflect
+
+From `a1-start` to here, TaskBoard grew one course at a time. `git log --oneline` tells that story in small
+commits, and the tag table above marks where each course stopped.
 
 ## Work on the API without Docker
 
