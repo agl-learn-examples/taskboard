@@ -8,3 +8,5 @@ htmlcov/
 .env
 pytest-report.xml
 coverage.xml
+gateway/certs/*.crt
+gateway/certs/*.key

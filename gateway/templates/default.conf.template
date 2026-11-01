@@ -21,6 +21,7 @@ upstream api {
 
 server {
     listen 80;
+    include /etc/nginx/https.d/*.conf;    # HTTPS (A7): only with compose.https.yaml; otherwise this adds nothing
     server_name _;
     access_log /dev/stdout gateway_json;
     client_max_body_size 1m;

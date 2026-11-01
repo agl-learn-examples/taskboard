@@ -1,0 +1,15 @@
+# HTTPS at the gateway, on your laptop (Course A7). Make the certificate once, then start with both files:
+#     gateway/certs/make-dev-cert.sh
+#     docker compose -f compose.yaml -f compose.https.yaml up -d --build --wait
+# https://localhost:8443 is the app; http://localhost:8080 now sends you there (301).
+# Without this file nothing changes: plain http on port 8080, as before.
+services:
+  gateway:
+    ports:
+      - "8443:443"
+    volumes:
+      - ./gateway/https.conf:/etc/nginx/https.d/https.conf:ro
+      - ./gateway/certs:/etc/nginx/certs:ro
+    healthcheck:
+      # plain http now answers 301, so check over https (busybox wget does not check the certificate)
+      test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://127.0.0.1/v1/health"]
