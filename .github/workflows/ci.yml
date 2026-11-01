@@ -24,7 +24,42 @@ jobs:
           cache: pip
           cache-dependency-path: api/requirements*.txt
       - run: pip install -r requirements-dev.txt
-      - run: pytest -q --cov
+      # Course B5: a JUnit XML report (every test, pass or fail) and a coverage report, kept as artifacts
+      - run: pytest -q --cov --cov-report=xml --cov-report=html --junitxml=pytest-report.xml
+      - if: always()
+        run: echo "Python ${{ matrix.python-version }}: coverage $(coverage report --format=total)%" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-report-${{ matrix.python-version }}
+          path: |
+            api/pytest-report.xml
+            api/coverage.xml
+            api/htmlcov/
+          retention-days: 14
+
+  lint:
+    # Course B5: the linters as a quality check; any finding fails the build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: api/requirements*.txt
+      - run: pip install -r api/requirements-dev.txt
+      - run: ruff check --output-format=github .      # github: each finding also shows on the PR's line
+        working-directory: api
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run lint
+        working-directory: web
 
   web:
     # the Angular app's unit tests (Vitest, in a fake browser: jsdom), then a production build

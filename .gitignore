@@ -6,3 +6,5 @@ tasks.db
 .coverage
 htmlcov/
 .env
+pytest-report.xml
+coverage.xml
