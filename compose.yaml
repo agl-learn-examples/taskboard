@@ -4,7 +4,7 @@
 # Settings have practice defaults here; put your own in a .env file (see .env.example) to change them.
 services:
   gateway:
-    image: nginx:1.30-alpine
+    build: ./web                    # nginx with the web app's files in it (web/Dockerfile)
     ports:
       - "${GATEWAY_PORT:-8080}:80"
     environment:
@@ -12,7 +12,6 @@ services:
       AUTH_BURST: ${AUTH_BURST:-5}
     volumes:
       - ./gateway/templates:/etc/nginx/templates:ro
-      - ./gateway/html:/usr/share/nginx/html:ro
     depends_on:
       api:
         condition: service_healthy
