@@ -19,12 +19,12 @@ It starts as the Tasks API you met in the DevOps track, and grows up course by c
 | API service | `api/` | Python and Flask: the rules (tenants, users, roles, plans, tasks) | A2, A3 |
 | Postgres | (image) | the database: tenants, users, boards, tasks | A2 |
 | Redis | (image) | fast, short-lived data: sessions, logged-out tokens, cached plans | A3 |
-| web app | `web/` | Angular | A5 (later) |
+| web app | `web/` | Angular: log in, list, add and change tasks; served by the gateway | A5 |
 | phone app | `mobile/` | Flutter | A6 (later) |
 
 ## Where you are
 
-`main` is the latest: everything up to Course B3, *API testing*. To see the code as a lesson saw it, check out
+`main` is the latest: everything up to Course A5, *Web front end with Angular*. To see the code as a lesson saw it, check out
 that lesson's tag (below).
 
 ## Run it (one command)
@@ -37,6 +37,8 @@ You need [Docker](https://docs.docker.com/get-docker/) with Compose v2 (`docker 
 
 The first start downloads the images and takes a few minutes. It is ready when the gateway says `Healthy`
 (`docker compose ps` in a second terminal). Stop it with Ctrl+C; `docker compose down -v` also deletes the data.
+
+Open http://localhost:8080 for the web app (Course A5) and log in as one of the demo users below.
 
 The stack starts with demo data. In a second terminal, log in as Priya and ask for her team's tasks:
 
@@ -73,6 +75,7 @@ database may be from another tag) and start again as the README at that tag says
 | `a4-gateway` | A4 · The API gateway | nginx in front: routing, token check, rate limits, JSON logs; one-command stack |
 | `b2-pytest` | B2 · Pytest from zero | the test suite: fixtures, parametrize, mocking, coverage |
 | `b3-api-tests` | B3 · API testing | httpx tests against the running stack: logins, contracts, tenants, rate limits; in CI |
+| `a5-angular` | A5 · Web front end with Angular | the web app in `web/`: task list, form, login; served by the gateway at `/` |
 
 ## Endpoints
 
@@ -148,7 +151,40 @@ Each test signs up its own new tenant, so tests never share data.
     docker compose down -v
 
 GitHub Actions runs both kinds on every push and pull request (`.github/workflows/ci.yml`): first the API
-service's tests, then the API tests against the whole stack.
+service's tests, then the API tests against the whole stack. It also runs the web app's unit tests (A5).
+
+## Course A5: the web app
+
+The web app is in `web/` (its README lists which file each lesson uses). `docker compose up --build` builds
+it (`web/Dockerfile`: Node builds the files, then they are copied into the gateway's nginx), so one address
+serves both: http://localhost:8080/ is the app, http://localhost:8080/v1/ is the API. Same address, so the
+browser needs no CORS settings.
+
+To change the app and see it at once, run the dev server. You need [Node.js](https://nodejs.org) 22.22 or
+newer (`node -v`).
+
+    docker compose up --build -d     # the API and the gateway, on port 8080
+    cd web
+    npm ci                           # the exact versions in package-lock.json
+    npm start                        # the dev server: http://localhost:4200, reloads when you save
+    npm test                         # the unit tests (Vitest), once, no browser window
+    npx ng build                     # the files the gateway serves, in dist/taskboard-web/browser/
+
+The dev server sends every `/v1/...` request on to the gateway (`proxy.conf.json`), so the app's code
+calls `/v1/tasks` in both places.
+
+What it does, page by page:
+
+| address | page | needs a login |
+|---|---|---|
+| `/login` | email and password; keeps the tokens in the browser's `localStorage` | no |
+| `/tasks` | your team's tasks, newest first; tick one to mark it done | yes |
+| `/tasks/new` | a new task: title (1 to 200 characters) and priority | yes |
+| `/tasks/<id>/edit` | change a task's title, priority or done | yes |
+
+Kept simple on purpose: no automatic token refresh (after 15 minutes the API answers 401 and the app sends
+you back to the login page), only the first 100 tasks, no boards, no delete button. Pages have
+`data-testid` attributes and labelled fields so Course B4's Playwright tests can find them.
 
 ## Work on the API without Docker
 
