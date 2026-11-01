@@ -1,0 +1,22 @@
+name: Performance
+# Course B5: the k6 test of the task list. Not on every push: start it by hand from the Actions tab
+# ("Performance", "Run workflow"). A crossed threshold (p95 500 ms, 1% errors) fails the run.
+on:
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: "virtual users (more than about 10 meet the gateway's rate limit)"
+        default: "5"
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose up -d --build --wait
+      - env:
+          VUS: ${{ inputs.vus }}     # through the environment, never pasted into the command
+        run: >
+          docker run --rm -i --network host -e VUS
+          -v "$PWD/tests/perf:/perf" grafana/k6:2.3.0 run /perf/tasks-list.js
+      - if: always()
+        run: docker compose down -v
